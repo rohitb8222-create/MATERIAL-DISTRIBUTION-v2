@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material Distribution System</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        body { font-family: 'Roboto', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; margin-top: 0; font-size: 22px; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+        .form-group { flex: 1; min-width: 150px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #555; font-size: 14px; }
+        select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        button { padding: 10px 20px; background-color: #007bff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: 500; transition: background 0.3s; flex: 1; min-width: 200px; }
+        button:hover { background-color: #0056b3; }
+        .btn-print { background-color: #28a745; }
+        .btn-print:hover { background-color: #218838; }
+        .action-buttons { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        
+        #printAreaWrapper { margin-top: 30px; display: none; overflow-x: auto; background: #ddd; padding: 20px; border-radius: 8px; }
+        
+        /* Print Canvas */
+        #printArea { 
+            background: #fff; 
+            position: relative; 
+            box-sizing: border-box;
+            margin: 0 auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            padding: 20px;
+            /* Allow flexible width for mobile processing */
+            max-width: 1000px; 
+        }
+        
+        /* Single Watermark Perfectly Centered */
+        #watermarkImg {
+            position: absolute;
+            top: 50%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.15;
+            width: 60%; /* Watermark chi size */
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        .print-content { position: relative; z-index: 1; width: 100%; }
+        
+        /* Logo left, Text center, Spacer Right */
+        .print-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .corner-logo { height: 80px; width: 80px; object-fit: contain; }
+        
+        .company-header { text-align: center; font-weight: bold; font-size: 18px; flex: 1; }
+        .doc-title { text-align: center; font-size: 16px; margin-bottom: 20px; text-decoration: underline; font-weight: bold; text-transform: uppercase; }
+        .meta-info { display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 15px; font-size: 15px; font-weight: bold; }
+        
+        /* Transparent Table to show watermark clearly */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background-color: transparent !important; page-break-inside: auto; font-family: Arial, sans-serif; }
+        th, td { border: 1px solid #000; padding: 10px 8px; text-align: left; font-size: 14px; background-color: transparent !important; }
+        th { background-color: rgba(230, 230, 230, 0.6) !important; font-weight: bold; text-align: center; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        
+        @media print {
+            body { background-color: #fff; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            #printAreaWrapper { padding: 0; background: none; display: block !important; overflow: visible; box-shadow: none; }
+            #printArea { width: 100% !important; max-width: none !important; padding: 0 !important; box-shadow: none; }
+            @page { margin: 10mm; size: A4 portrait; }
+            thead { display: table-header-group; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container no-print">
+    <h2>Material Distribution Generator</h2>
+
+    <div style="display: none;" id="statusIndicator"></div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="shift">1. Shift Select Kara</label>
+            <select id="shift" onchange="updateUnits()"><option value="">Aadhi data load kara</option></select>
+        </div>
+        <div class="form-group">
+            <label for="ward">2. Ward</label>
+            <select id="ward"><option value="">All Wards</option></select>
+        </div>
+        <div class="form-group">
+            <label for="unit">3. Unit</label>
+            <select id="unit"><option value="">All Units</option></select>
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="material">Material Type</label>
+            <select id="material" onchange="toggleCustomMaterial()">
+                <option value="Uniform">Uniform</option>
+                <option value="Raincoat">Raincoat</option>
+                <option value="Shoes">Shoes</option>
+                <option value="Hand gloves">Hand gloves</option>
+                <option value="Mask">Mask</option>
+                <option value="Custom">Other (Custom Material)</option>
+            </select>
+            <input type="text" id="customMaterial" placeholder="Material che naav taka" style="display:none; margin-top: 10px;">
+        </div>
+        <div class="form-group">
+            <label for="supervisor">Supervisor Name</label>
+            <input type="text" id="supervisor" placeholder="Supervisor che naav taka">
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <button onclick="generateTable()">1. Generate List (View)</button>
+        <button class="btn-print" onclick="window.print()">2. Print / Save as PDF (PC)</button>
+        <button class="btn-print" id="mobileBtn" onclick="downloadMobilePDF()" style="background-color: #dc3545;">3. Download PDF (Mobile)</button>
+    </div>
+</div>
+
+<div id="printAreaWrapper">
+    <div id="printArea">
+        <img id="watermarkImg" src="" alt="Watermark" crossorigin="anonymous">
+        
+        <div class="print-content">
+            <div class="print-header-row">
+                <img id="cornerLogo" class="corner-logo" src="" alt="Logo" crossorigin="anonymous">
+                <div class="company-header">SUMEET ELKOPLAST KALYAN MSW PVT. LTD.,<br>Kalyan, MUMBAI.</div>
+                <div style="width: 80px;"></div> </div>
+            
+            <div class="doc-title">PP & Kit - Material Distribution List (<span id="out_material"></span>)</div>
+            
+            <div class="meta-info">
+                <div>Supervisor Name: <span id="out_supervisor" style="border-bottom: 1px dashed #000; padding-right: 50px;"></span></div>
+                <div>Date: <span style="border-bottom: 1px dashed #000; padding-right: 80px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+            </div>
+            <div class="meta-info">
+                <div>Admin Ward: <span id="out_ward"></span></div>
+                <div>Unit Nos.: <span id="out_unit"></span></div>
+                <div>Shift: <span id="out_shift"></span></div>
+            </div>
+            
+            <table>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqyrjPp7jAyDOMkiV2BVuKkzS9FvmHoTQOq5d-9fyJxSmw0E4OVKVPix62Cuzs9d7Mx9ameMUtZIC-/pub?output=csv";
+    let empData = [];
+    
+    // Make sure your file is named exactly 'logo.png' on GitHub
+    const GITHUB_LOGO_URL = "logo.png"; 
+
+    window.onload = function() {
+        let wLogo = document.getElementById('watermarkImg');
+        let cLogo = document.getElementById('cornerLogo');
+        wLogo.src = GITHUB_LOGO_URL;
+        cLogo.src = GITHUB_LOGO_URL;
+        
+        // Prevents broken image icon if logo is not found
+        wLogo.onerror = function() { this.style.display='none'; };
+        cLogo.onerror = function() { this.style.display='none'; };
+
+        fetchCSVFromGoogleSheet(); // Connect silently
+    };
+
+    function fetchCSVFromGoogleSheet() {
+        Papa.parse(CSV_URL, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                let rawData = results.data;
+                empData = [];
+                
+                rawData.forEach(row => {
+                    let cleanRow = {};
+                    for (let key in row) {
+                        cleanRow[key.trim().toUpperCase()] = row[key];
+                    }
+                    
+                    let empid = cleanRow['EMPID'] || cleanRow['EMP ID'] || cleanRow['ID'];
+                    if (empid) {
+                        empData.push({
+                            empid: empid,
+                            name: cleanRow['EMPLOYEE NAME'] || cleanRow['NAME'] || '',
+                            desig: cleanRow['OPS DESIGNATION'] || cleanRow['DESIGNATION'] || '',
+                            ward: cleanRow['AD. WARD'] || cleanRow['WARD'] || '',
+                            unit: cleanRow['UNIT'] || '',
+                            shift: cleanRow['SHIFT'] || ''
+                        });
+                    }
+                });
+
+                if(empData.length > 0) {
+                    populateInitialDropdowns();
+                }
+            },
+            error: function(err) {
+                console.error("Silent Error Fetching Data", err);
+            }
+        });
+    }
+
+    function populateInitialDropdowns() {
+        let shifts = new Set();
+        let wards = new Set();
+        
+        empData.forEach(d => {
+            if(d.shift) shifts.add(String(d.shift).trim().toUpperCase());
+            if(d.ward) wards.add(String(d.ward).trim().toUpperCase());
+        });
+        
+        const populate = (id, set, allLabel) => {
+            let select = document.getElementById(id);
+            select.innerHTML = '<option value="">' + allLabel + '</option>';
+            [...set].sort().forEach(val => {
+                if(val) {
+                    let opt = document.createElement('option');
+                    opt.value = val;
+                    opt.innerHTML = val;
+                    select.appendChild(opt);
+                }
+            });
+        };
+        
+        populate('shift', shifts, 'All Shifts');
+        populate('ward', wards, 'All Wards');
+        updateUnits();
+    }
+    
+    function updateUnits() {
+        const shift = document.getElementById('shift').value;
+        const unitSelect = document.getElementById('unit');
+        
+        unitSelect.innerHTML = '<option value="">All Units</option>';
+        if(empData.length === 0) return;
+        
+        let allowedUnits = new Set();
+        if (shift === 'B' || shift === 'C') {
+            allowedUnits.add('DEPOT');
+        } else {
+            empData.forEach(d => {
+                if (shift === '' || String(d.shift).trim().toUpperCase() === shift) {
+                    if(d.unit) allowedUnits.add(String(d.unit).trim().toUpperCase());
+                }
+            });
+        }
+        
+        [...allowedUnits].sort().forEach(val => {
+            let opt = document.createElement('option');
+            opt.value = val;
+            opt.innerHTML = val;
+            unitSelect.appendChild(opt);
+        });
+    }
+    
+    function toggleCustomMaterial() {
+        let mat = document.getElementById('material').value;
+        let customInput = document.getElementById('customMaterial');
+        if(mat === 'Custom') {
+            customInput.style.display = 'block';
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+        }
+    }
+
+    function generateTable() {
+        if(empData.length === 0) {
+            alert("Data load honyachi vaat paha (Google Sheet Connect hot ahe)!");
+            return;
+        }
+
+        const shift = document.getElementById('shift').value;
+        const ward = document.getElementById('ward').value;
+        const unit = document.getElementById('unit').value;
+        const supervisor = document.getElementById('supervisor').value;
+        
+        let material = document.getElementById('material').value;
+        if(material === 'Custom') {
+            material = document.getElementById('customMaterial').value || "Custom Material";
+        }
+        
+        document.getElementById('out_material').innerText = material;
+        document.getElementById('out_supervisor').innerText = supervisor || "_________________";
+        document.getElementById('out_ward').innerText = ward || "All";
+        document.getElementById('out_unit').innerText = unit || "All";
+        document.getElementById('out_shift').innerText = shift || "All";
+        
+        let showSize = (document.getElementById('material').value === 'Uniform' || document.getElementById('material').value === 'Shoes');
+        
+        let filtered = empData.filter(d => 
+            (shift === '' || String(d.shift).trim().toUpperCase() === shift) &&
+            (ward === '' || String(d.ward).trim().toUpperCase() === ward) &&
+            (unit === '' || String(d.unit).trim().toUpperCase() === unit)
+        );
+        
+        let thead = '<tr><th style="width: 50px; text-align:center;">Sr.No</th><th style="width: 80px; text-align:center;">EMP ID</th><th>Employee Name</th><th>Designation</th>';
+        if (showSize) {
+            thead += '<th style="width: 80px; text-align:center;">Size</th>';
+        }
+        thead += '<th style="width: 100px; text-align:center;">Signature</th></tr>';
+        document.getElementById('tableHead').innerHTML = thead;
+        
+        let tbody = '';
+        if(filtered.length === 0) {
+            tbody = `<tr><td colspan="${showSize ? 6 : 5}" style="text-align:center; padding: 20px;">No records found</td></tr>`;
+        } else {
+            filtered.forEach((d, i) => {
+                tbody += `<tr>
+                    <td style="text-align:center;">${i+1}</td>
+                    <td style="text-align:center;">${d.empid}</td>
+                    <td>${d.name}</td>
+                    <td>${d.desig}</td>`;
+                if (showSize) tbody += '<td></td>';
+                tbody += '<td></td></tr>';
+            });
+        }
+        
+        let startIndex = filtered.length + 1;
+        for(let j = 0; j < 5; j++) {
+            tbody += `<tr>
+                <td style="height: 35px; text-align:center;">${startIndex + j}</td>
+                <td></td>
+                <td></td>
+                <td></td>`;
+            if (showSize) tbody += '<td></td>';
+            tbody += '<td></td></tr>';
+        }
+        
+        document.getElementById('tableBody').innerHTML = tbody;
+        document.getElementById('printAreaWrapper').style.display = 'block';
+    }
+
+    function downloadMobilePDF() {
+        const element = document.getElementById('printArea');
+        if(element.parentElement.style.display === 'none') {
+            alert("Krupaya aadhi '1. Generate List' var click kara!");
+            return;
+        }
+
+        const btn = document.getElementById('mobileBtn');
+        const oldText = btn.innerText;
+        btn.innerText = "PDF Tayar hot ahe...";
+
+        let shiftStr = document.getElementById('shift').value || "All";
+        let unitStr = document.getElementById('unit').value || "All";
+        let fileName = `Material_List_${shiftStr}_${unitStr}.pdf`;
+
+        var opt = {
+            margin:       5, 
+            filename:     fileName,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, allowTaint: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Handle PDF generation cleanly without freezing UI
+        try {
+            html2pdf().set(opt).from(element).save().then(() => {
+                btn.innerText = oldText;
+            }).catch(err => {
+                console.error("PDF Generate Error: ", err);
+                alert("PDF generate karnyat adchan aali. (Logo cha problem asu shakto)");
+                btn.innerText = oldText;
+            });
+        } catch(e) {
+            console.error("Critical Error: ", e);
+            btn.innerText = oldText;
+        }
+    }
+</script>
+</body>
+</html>
