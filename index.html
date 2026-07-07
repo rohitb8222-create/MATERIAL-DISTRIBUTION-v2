@@ -7,7 +7,8 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
@@ -24,48 +25,31 @@
         .btn-print:hover { background-color: #218838; }
         .action-buttons { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
         
+        /* Print Area Styling for UI Display */
         #printAreaWrapper { margin-top: 30px; display: none; overflow-x: auto; background: #ddd; padding: 20px; border-radius: 8px; }
-        
-        /* Print Canvas */
         #printArea { 
-            background: #fff; 
-            position: relative; 
-            box-sizing: border-box;
-            margin: 0 auto;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            padding: 20px;
-            /* Allow flexible width for mobile processing */
-            max-width: 1000px; 
+            background: #fff; position: relative; box-sizing: border-box; margin: 0 auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 20px; max-width: 1000px; 
         }
         
-        /* Single Watermark Perfectly Centered */
         #watermarkImg {
-            position: absolute;
-            top: 50%; 
-            left: 50%;
-            transform: translate(-50%, -50%);
-            opacity: 0.15;
-            width: 60%; /* Watermark chi size */
-            z-index: 0;
-            pointer-events: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            opacity: 0.15; width: 60%; z-index: 0; pointer-events: none;
         }
         
         .print-content { position: relative; z-index: 1; width: 100%; }
-        
-        /* Logo left, Text center, Spacer Right */
         .print-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .corner-logo { height: 80px; width: 80px; object-fit: contain; }
-        
         .company-header { text-align: center; font-weight: bold; font-size: 18px; flex: 1; }
         .doc-title { text-align: center; font-size: 16px; margin-bottom: 20px; text-decoration: underline; font-weight: bold; text-transform: uppercase; }
         .meta-info { display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 15px; font-size: 15px; font-weight: bold; }
         
-        /* Transparent Table to show watermark clearly */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background-color: transparent !important; page-break-inside: auto; font-family: Arial, sans-serif; }
         th, td { border: 1px solid #000; padding: 10px 8px; text-align: left; font-size: 14px; background-color: transparent !important; }
         th { background-color: rgba(230, 230, 230, 0.6) !important; font-weight: bold; text-align: center; }
         tr { page-break-inside: avoid; page-break-after: auto; }
         
+        /* PC Print specific */
         @media print {
             body { background-color: #fff; margin: 0; padding: 0; }
             .no-print { display: none !important; }
@@ -80,8 +64,6 @@
 
 <div class="container no-print">
     <h2>Material Distribution Generator</h2>
-
-    <div style="display: none;" id="statusIndicator"></div>
 
     <div class="form-row">
         <div class="form-group">
@@ -132,7 +114,8 @@
             <div class="print-header-row">
                 <img id="cornerLogo" class="corner-logo" src="" alt="Logo" crossorigin="anonymous">
                 <div class="company-header">SUMEET ELKOPLAST KALYAN MSW PVT. LTD.,<br>Kalyan, MUMBAI.</div>
-                <div style="width: 80px;"></div> </div>
+                <div style="width: 80px;"></div> 
+            </div>
             
             <div class="doc-title">PP & Kit - Material Distribution List (<span id="out_material"></span>)</div>
             
@@ -146,7 +129,7 @@
                 <div>Shift: <span id="out_shift"></span></div>
             </div>
             
-            <table>
+            <table id="dataTable">
                 <thead id="tableHead"></thead>
                 <tbody id="tableBody"></tbody>
             </table>
@@ -158,8 +141,7 @@
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqyrjPp7jAyDOMkiV2BVuKkzS9FvmHoTQOq5d-9fyJxSmw0E4OVKVPix62Cuzs9d7Mx9ameMUtZIC-/pub?output=csv";
     let empData = [];
     
-    // Make sure your file is named exactly 'logo.png' on GitHub
-    const GITHUB_LOGO_URL = "logo.png"; 
+    const GITHUB_LOGO_URL = "logo.png"; // Tumcha logo file name
 
     window.onload = function() {
         let wLogo = document.getElementById('watermarkImg');
@@ -167,7 +149,6 @@
         wLogo.src = GITHUB_LOGO_URL;
         cLogo.src = GITHUB_LOGO_URL;
         
-        // Prevents broken image icon if logo is not found
         wLogo.onerror = function() { this.style.display='none'; };
         cLogo.onerror = function() { this.style.display='none'; };
 
@@ -278,7 +259,7 @@
 
     function generateTable() {
         if(empData.length === 0) {
-            alert("Data load honyachi vaat paha (Google Sheet Connect hot ahe)!");
+            alert("Data background la load hot ahe, thoda thamba!");
             return;
         }
 
@@ -343,9 +324,11 @@
         document.getElementById('printAreaWrapper').style.display = 'block';
     }
 
+    // Advanced jsPDF AutoTable function specifically for Mobile
+    window.jsPDF = window.jspdf.jsPDF;
+    
     function downloadMobilePDF() {
-        const element = document.getElementById('printArea');
-        if(element.parentElement.style.display === 'none') {
+        if(document.getElementById('tableBody').innerHTML.trim() === '') {
             alert("Krupaya aadhi '1. Generate List' var click kara!");
             return;
         }
@@ -354,29 +337,118 @@
         const oldText = btn.innerText;
         btn.innerText = "PDF Tayar hot ahe...";
 
-        let shiftStr = document.getElementById('shift').value || "All";
-        let unitStr = document.getElementById('unit').value || "All";
-        let fileName = `Material_List_${shiftStr}_${unitStr}.pdf`;
-
-        var opt = {
-            margin:       5, 
-            filename:     fileName,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, allowTaint: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        // Handle PDF generation cleanly without freezing UI
         try {
-            html2pdf().set(opt).from(element).save().then(() => {
-                btn.innerText = oldText;
-            }).catch(err => {
-                console.error("PDF Generate Error: ", err);
-                alert("PDF generate karnyat adchan aali. (Logo cha problem asu shakto)");
-                btn.innerText = oldText;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+
+            let shiftStr = document.getElementById('shift').value || "All";
+            let unitStr = document.getElementById('unit').value || "All";
+            let wardStr = document.getElementById('ward').value || "All";
+            let supStr = document.getElementById('supervisor').value || "_________________";
+            let matStr = document.getElementById('out_material').innerText;
+
+            // Watermark function for EVERY page
+            const addWatermark = (doc) => {
+                const logoImg = document.getElementById('cornerLogo');
+                if (logoImg && logoImg.src && logoImg.complete && logoImg.naturalWidth !== 0) {
+                    try {
+                        doc.setGState(new doc.GState({opacity: 0.1}));
+                        let w = 120; let h = 120;
+                        let x = (pageWidth - w) / 2;
+                        let y = (pageHeight - h) / 2;
+                        doc.addImage(logoImg, 'PNG', x, y, w, h);
+                        doc.setGState(new doc.GState({opacity: 1.0}));
+                    } catch(e) {}
+                }
+            };
+
+            // 1. Add Corner Logo
+            const logoImg = document.getElementById('cornerLogo');
+            if (logoImg && logoImg.src && logoImg.complete && logoImg.naturalWidth !== 0) {
+                try {
+                    doc.addImage(logoImg, 'PNG', 15, 10, 22, 22);
+                } catch(e) {}
+            }
+
+            // 2. Add Headers
+            let currentY = 16;
+            doc.setFontSize(13);
+            doc.setFont("helvetica", "bold");
+            doc.text("SUMEET ELKOPLAST KALYAN MSW PVT. LTD.,", pageWidth / 2, currentY, {align: 'center'});
+            currentY += 6;
+            doc.text("Kalyan, MUMBAI.", pageWidth / 2, currentY, {align: 'center'});
+            currentY += 10;
+            
+            doc.setFontSize(11);
+            let title = `PP & Kit - Material Distribution List (${matStr})`;
+            doc.text(title, pageWidth / 2, currentY, {align: 'center'});
+            let textWidth = doc.getTextWidth(title);
+            doc.line((pageWidth - textWidth)/2, currentY + 1, (pageWidth + textWidth)/2, currentY + 1);
+            currentY += 10;
+
+            // 3. Add Meta Information
+            doc.setFontSize(10);
+            doc.text(`Supervisor Name: ${supStr}`, 15, currentY);
+            doc.text(`Date: ______________`, pageWidth - 45, currentY);
+            currentY += 6;
+            doc.text(`Admin Ward: ${wardStr}`, 15, currentY);
+            doc.text(`Unit Nos.: ${unitStr}`, pageWidth / 2, currentY, {align: 'center'});
+            doc.text(`Shift: ${shiftStr}`, pageWidth - 15, currentY, {align: 'right'});
+            currentY += 6;
+
+            // 4. Build Table Array Manually for exact control
+            let headData = [];
+            let bodyData = [];
+            
+            document.querySelectorAll('#tableHead tr').forEach(tr => {
+                let row = [];
+                tr.querySelectorAll('th').forEach(th => row.push(th.innerText));
+                headData.push(row);
             });
+
+            document.querySelectorAll('#tableBody tr').forEach(tr => {
+                let row = [];
+                tr.querySelectorAll('td').forEach(td => row.push(td.innerText));
+                bodyData.push(row);
+            });
+
+            let showSize = (document.getElementById('material').value === 'Uniform' || document.getElementById('material').value === 'Shoes');
+
+            // Set column widths based on whether 'Size' is present
+            let colStyles = showSize ? {
+                0: { halign: 'center', cellWidth: 15 },
+                1: { halign: 'center', cellWidth: 25 },
+                4: { halign: 'center', cellWidth: 20 },
+                5: { halign: 'center', cellWidth: 30 }
+            } : {
+                0: { halign: 'center', cellWidth: 15 },
+                1: { halign: 'center', cellWidth: 25 },
+                4: { halign: 'center', cellWidth: 35 }
+            };
+
+            // 5. Generate AutoTable (Handles Page Breaks & Repeating Headers Natively)
+            doc.autoTable({
+                head: headData,
+                body: bodyData,
+                startY: currentY,
+                theme: 'grid',
+                styles: { fontSize: 9, font: 'helvetica', textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.2 },
+                headStyles: { fillColor: [230, 230, 230], textColor: [0,0,0], fontStyle: 'bold', halign: 'center' },
+                bodyStyles: { minCellHeight: 12, valign: 'middle' },
+                columnStyles: colStyles,
+                didDrawPage: function (data) {
+                    addWatermark(doc); // Puts watermark exactly centered on every single page
+                }
+            });
+
+            // Download file
+            doc.save(`Material_List_${shiftStr}_${unitStr}.pdf`);
+            btn.innerText = oldText;
+            
         } catch(e) {
-            console.error("Critical Error: ", e);
+            console.error(e);
+            alert("PDF generate karnyat adchan aali.");
             btn.innerText = oldText;
         }
     }
